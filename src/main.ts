@@ -154,6 +154,8 @@ async function main() {
 
       const ringRadiuss = [0.2, 0.3, 0.4];
       const width = 0.002;
+      const minRadius = 0.18; // 0.2
+      const maxRadius = ringRadiuss[ringRadiuss.length - 1] + width; // 0.402
 
       const rings = ringRadiuss.map((innerRadius, index) => {
         const ringGeometry = new THREE.RingGeometry(
@@ -184,40 +186,113 @@ async function main() {
           transparent: true,
           opacity: 0.2,
           side: THREE.DoubleSide,
+          depthWrite: false, // Add this to prevent depth conflicts
         });
 
-        const positions = [
-          { x: 0.15, y: 0.45 },
-          { x: 0.45, y: 0.15 },
-          { x: 0.3, y: 0.3 },
-          { x: 0.2, y: 0.1 },
-          { x: 0.1, y: 0.2 },
-          { x: -0.15, y: 0.45 },
-          { x: -0.45, y: 0.15 },
-          { x: -0.3, y: 0.3 },
-          { x: -0.2, y: 0.1 },
-          { x: -0.1, y: 0.2 },
-          { x: -0.15, y: -0.45 },
-          { x: -0.45, y: -0.15 },
-          { x: -0.3, y: -0.3 },
-          { x: -0.2, y: -0.1 },
-          { x: -0.1, y: -0.2 },
-          { x: 0.15, y: -0.45 },
-          { x: 0.45, y: -0.15 },
-          { x: 0.3, y: -0.3 },
-          { x: 0.2, y: -0.1 },
-          { x: 0.1, y: -0.2 },
-        ];
+        // Poisson disc sampling for natural distribution without clustering
+        function poissonDiscInRing(
+          minR: number,
+          maxR: number,
+          minDistance: number,
+          maxAttempts = 30
+        ) {
+          const points: { x: number; y: number }[] = [];
+          const cellSize = minDistance / Math.sqrt(2);
+          const grid = new Map<string, { x: number; y: number }[]>();
 
-        positions.forEach((pos) => {
+          function gridKey(x: number, y: number) {
+            return `${Math.floor(x / cellSize)},${Math.floor(y / cellSize)}`;
+          }
+
+          function isValid(x: number, y: number) {
+            const dist = Math.sqrt(x * x + y * y);
+            if (dist < minR || dist > maxR) return false;
+
+            // Check neighboring cells
+            const gx = Math.floor(x / cellSize);
+            const gy = Math.floor(y / cellSize);
+
+            for (let i = -2; i <= 2; i++) {
+              for (let j = -2; j <= 2; j++) {
+                const key = `${gx + i},${gy + j}`;
+                const nearby = grid.get(key);
+                if (nearby) {
+                  for (const p of nearby) {
+                    const dx = p.x - x;
+                    const dy = p.y - y;
+                    if (Math.sqrt(dx * dx + dy * dy) < minDistance) {
+                      return false;
+                    }
+                  }
+                }
+              }
+            }
+            return true;
+          }
+
+          function addPoint(x: number, y: number) {
+            const key = gridKey(x, y);
+            if (!grid.has(key)) grid.set(key, []);
+            grid.get(key)!.push({ x, y });
+            points.push({ x, y });
+          }
+
+          // Start with initial random point
+          function randomPointInRing(minR: number, maxR: number) {
+            const angle = Math.random() * Math.PI * 2;
+            const radius = Math.sqrt(
+              Math.random() * (maxR * maxR - minR * minR) + minR * minR
+            );
+            return {
+              x: Math.cos(angle) * radius,
+              y: Math.sin(angle) * radius,
+            };
+          }
+
+          const initialPoint = randomPointInRing(minR, maxR);
+          addPoint(initialPoint.x, initialPoint.y);
+
+          const activeList = [initialPoint];
+
+          while (activeList.length > 0) {
+            const randomIndex = Math.floor(Math.random() * activeList.length);
+            const point = activeList[randomIndex];
+            let found = false;
+
+            for (let i = 0; i < maxAttempts; i++) {
+              const angle = Math.random() * Math.PI * 2;
+              const radius = minDistance + Math.random() * minDistance;
+              const newX = point.x + Math.cos(angle) * radius;
+              const newY = point.y + Math.sin(angle) * radius;
+
+              if (isValid(newX, newY)) {
+                addPoint(newX, newY);
+                activeList.push({ x: newX, y: newY });
+                found = true;
+                break;
+              }
+            }
+
+            if (!found) {
+              activeList.splice(randomIndex, 1);
+            }
+          }
+
+          return points;
+        }
+
+        // Generate well-distributed plane positions
+        const planePositions = poissonDiscInRing(minRadius, maxRadius, 0.1);
+
+        planePositions.forEach((pos) => {
           const _2dPlane = new THREE.Mesh(geometry, material);
-          _2dPlane.position.set(pos.x, pos.y, 0);
+          // Move planes slightly forward in Z to avoid Z-fighting with rings
+          _2dPlane.position.set(pos.x, pos.y, 0.005); // Changed from 0 to 0.005
           const angle = Math.atan2(pos.y, pos.x);
           _2dPlane.rotation.z = angle;
           obj3d.add(_2dPlane);
         });
       }
-
       obj3dWrapper.rotateX(THREE.MathUtils.degToRad(-90));
 
       // GSAP Animations (Optimized for Mobile)
