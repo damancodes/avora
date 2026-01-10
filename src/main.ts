@@ -194,6 +194,7 @@ async function main() {
           minR: number,
           maxR: number,
           minDistance: number,
+          excludeRanges: Array<{ min: number; max: number }> = [],
           maxAttempts = 30
         ) {
           const points: { x: number; y: number }[] = [];
@@ -204,9 +205,16 @@ async function main() {
             return `${Math.floor(x / cellSize)},${Math.floor(y / cellSize)}`;
           }
 
+          function isInExcludedRange(dist: number) {
+            return excludeRanges.some(
+              (range) => dist >= range.min && dist <= range.max
+            );
+          }
+
           function isValid(x: number, y: number) {
             const dist = Math.sqrt(x * x + y * y);
             if (dist < minR || dist > maxR) return false;
+            if (isInExcludedRange(dist)) return false;
 
             // Check neighboring cells
             const gx = Math.floor(x / cellSize);
@@ -239,14 +247,20 @@ async function main() {
 
           // Start with initial random point
           function randomPointInRing(minR: number, maxR: number) {
-            const angle = Math.random() * Math.PI * 2;
-            const radius = Math.sqrt(
-              Math.random() * (maxR * maxR - minR * minR) + minR * minR
-            );
-            return {
-              x: Math.cos(angle) * radius,
-              y: Math.sin(angle) * radius,
-            };
+            let angle, radius, x, y, dist;
+            let attempts = 0;
+            do {
+              angle = Math.random() * Math.PI * 2;
+              radius = Math.sqrt(
+                Math.random() * (maxR * maxR - minR * minR) + minR * minR
+              );
+              x = Math.cos(angle) * radius;
+              y = Math.sin(angle) * radius;
+              dist = Math.sqrt(x * x + y * y);
+              attempts++;
+            } while (isInExcludedRange(dist) && attempts < 100);
+
+            return { x, y };
           }
 
           const initialPoint = randomPointInRing(minR, maxR);
@@ -281,8 +295,19 @@ async function main() {
           return points;
         }
 
-        // Generate well-distributed plane positions
-        const planePositions = poissonDiscInRing(minRadius, maxRadius, 0.1);
+        // Create exclude ranges for each ring (inner radius to outer radius)
+        const excludeRanges = ringRadiuss.map((innerRadius) => ({
+          min: innerRadius - 0.005, // Small buffer
+          max: innerRadius + width + 0.005, // Small buffer
+        }));
+
+        // Generate well-distributed plane positions, excluding ring areas
+        const planePositions = poissonDiscInRing(
+          minRadius,
+          maxRadius,
+          0.1,
+          excludeRanges
+        );
 
         planePositions.forEach((pos) => {
           const _2dPlane = new THREE.Mesh(geometry, material);
@@ -311,7 +336,7 @@ async function main() {
 
       gsap.to(obj3d.rotation, {
         z: "+=" + Math.PI * 2,
-        duration: 50,
+        duration: 100,
         repeat: -1,
         ease: "linear",
       });
