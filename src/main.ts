@@ -79,7 +79,7 @@ async function main() {
     return new THREE.CanvasTexture(canvas);
   };
   const contrailTexture = createContrailTexture();
-
+  void contrailTexture;
   // --- RENDERER WITH FLICKER FIX ---
   const renderer = new THREE.WebGLRenderer({
     canvas,
