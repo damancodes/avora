@@ -16,7 +16,7 @@ gui.hide();
 
 async function main() {
   const scene = new THREE.Scene();
-  scene.position.y += 0.1;
+  // scene.position.y += 4;
 
   // --- MOUSE PARALLAX START ---
   const cursor = { x: 0, y: 0 };
@@ -58,7 +58,7 @@ async function main() {
   const aspect = window.innerWidth / window.innerHeight;
   const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
 
-  camera.position.set(0, 0, 1);
+  // camera.position.set(0, 0, 1);
   scene.add(camera);
 
   const canvas = document.getElementById("c") as HTMLCanvasElement;
@@ -111,9 +111,8 @@ async function main() {
   const loader = new THREE.TextureLoader();
   const texture = loader.load(generateAssetPath("/images/plane.png"));
 
-  gltfLoader.load(generateAssetPath("/model/plane1.glb"), (root) => {
+  gltfLoader.load(generateAssetPath("/model/plane2.glb"), (root) => {
     const model = root.scene;
-    model.scale.set(0.01, 0.01, 0.01);
 
     const box = new THREE.Box3().setFromObject(model);
     const boxSize = box.getSize(new THREE.Vector3()).length();
@@ -131,6 +130,8 @@ async function main() {
 
     camera.position.copy(direction.multiplyScalar(distance).add(boxCenter));
 
+    camera.position.y = 0;
+
     camera.near = boxSize / 100;
     camera.far = boxSize * 3;
     camera.updateProjectionMatrix();
@@ -140,9 +141,9 @@ async function main() {
 
     // Initial rotation (Kept exactly as requested)
     {
+      model.rotateX(THREE.MathUtils.degToRad(10));
       model.rotateY(THREE.MathUtils.degToRad(-140));
-      model.rotateZ(-0.2);
-      model.rotateX(-0.3);
+      // model.rotateZ(THREE.MathUtils.degToRad(10));
     }
 
     {
@@ -343,9 +344,9 @@ async function main() {
 
       obj3d.scale.set(0, 0, 0);
       gsap.to(obj3d.scale, {
-        x: 6,
-        y: 6,
-        z: 6,
+        x: 50,
+        y: 50,
+        z: 50,
         scrollTrigger: {
           trigger: "body",
           start: "top top",
@@ -377,10 +378,15 @@ async function main() {
     }
 
     {
-      const directionalLight = new THREE.DirectionalLight("#ffffff", 14);
+      const directionalLight = new THREE.DirectionalLight("#ffffff", 5);
       directionalLight.position.copy(camera.position);
       scene.add(directionalLight);
       scene.add(directionalLight.target);
+    }
+    {
+      const ambLight = new THREE.AmbientLight("#ffffff", 0.2);
+
+      scene.add(ambLight);
     }
 
     {
