@@ -5,6 +5,14 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { generateAssetPath } from "./util";
 
+const mouse = { x: 0, y: 0 };
+const targetMouse = { x: 0, y: 0 };
+
+window.addEventListener("mousemove", (event) => {
+  // Normalize coordinates from -1 to +1
+  targetMouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  targetMouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+});
 // --- MOBILE GSAP FIXES ---
 gsap.registerPlugin(ScrollTrigger);
 // Prevents the animation from jumping when the mobile address bar disappears
@@ -16,29 +24,10 @@ gui.hide();
 
 async function main() {
   const scene = new THREE.Scene();
-  // scene.position.y += 4;
 
-  // --- MOUSE PARALLAX START ---
-  const cursor = { x: 0, y: 0 };
-
-  window.addEventListener("mousemove", (e) => {
-    cursor.x = e.clientX / window.innerWidth - 0.5;
-    cursor.y = e.clientY / window.innerHeight - 0.5;
-
-    // Smoothly transition the scene position
-    // gsap.to(scene.position, {
-    //   x: cursor.x * 0.3, // Adjust 0.3 to increase/decrease horizontal intensity
-    //   y: cursor.y * -0.3 + 0.1, // Adjust 0.3 to increase/decrease vertical intensity
-    //   duration: 1.5,
-    //   ease: "power3.out",
-    // });
-    gsap.to(camera.rotation, {
-      y: -cursor.x * 0.05,
-      x: -cursor.y * 0.05,
-      duration: 2,
-      ease: "power2.out",
-    });
-  });
+  const mainGroup = new THREE.Object3D();
+  scene.add(mainGroup);
+  mainGroup.position.y -= 0.2;
 
   const bgParams = {
     background: "#202020",
@@ -100,8 +89,6 @@ async function main() {
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
 
-      // Responsive FOV: Make it wider on portrait mobile screens
-      camera.fov = camera.aspect < 1 ? 60 : 45;
       camera.updateProjectionMatrix();
     }
     return needResize;
@@ -114,6 +101,8 @@ async function main() {
   gltfLoader.load(generateAssetPath("/model/plane2.glb"), (root) => {
     const model = root.scene;
 
+    model.scale.set(0.2, 0.2, 0.2);
+    model.position.y -= 0.3;
     const box = new THREE.Box3().setFromObject(model);
     const boxSize = box.getSize(new THREE.Vector3()).length();
     const boxCenter = box.getCenter(new THREE.Vector3());
@@ -137,7 +126,7 @@ async function main() {
     camera.updateProjectionMatrix();
     camera.lookAt(boxCenter.x, boxCenter.y, boxCenter.z);
 
-    scene.add(model);
+    mainGroup.add(model);
 
     // Initial rotation (Kept exactly as requested)
     {
@@ -151,7 +140,7 @@ async function main() {
       const obj3d = new THREE.Object3D();
       obj3d.position.z = model.position.z - 0.05;
       obj3dWrapper.add(obj3d);
-      scene.add(obj3dWrapper);
+      mainGroup.add(obj3dWrapper);
 
       const ringRadiuss = [0.2, 0.3, 0.4];
       const width = 0.002;
@@ -343,10 +332,11 @@ async function main() {
       });
 
       obj3d.scale.set(0, 0, 0);
+
       gsap.to(obj3d.scale, {
-        x: 50,
-        y: 50,
-        z: 50,
+        x: 8,
+        y: 8,
+        z: 8,
         scrollTrigger: {
           trigger: "body",
           start: "top top",
@@ -367,7 +357,7 @@ async function main() {
 
       gsap.to(model.rotation, {
         x: "+=0.4",
-        y: "+=1",
+        y: "+=0.7",
         scrollTrigger: {
           trigger: "body",
           start: "top top",
@@ -380,13 +370,13 @@ async function main() {
     {
       const directionalLight = new THREE.DirectionalLight("#ffffff", 5);
       directionalLight.position.copy(camera.position);
-      scene.add(directionalLight);
-      scene.add(directionalLight.target);
+      mainGroup.add(directionalLight);
+      mainGroup.add(directionalLight.target);
     }
     {
       const ambLight = new THREE.AmbientLight("#ffffff", 0.2);
 
-      scene.add(ambLight);
+      mainGroup.add(ambLight);
     }
 
     {
@@ -395,8 +385,26 @@ async function main() {
     }
   });
 
+  window.addEventListener("mousemove", (event) => {
+    // Normalize coordinates from -1 to +1
+    targetMouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    targetMouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  });
+  function parallax() {
+    mouse.x += (targetMouse.x - mouse.x) * 0.05;
+    mouse.y += (targetMouse.y - mouse.y) * 0.05;
+
+    mainGroup.position.x = mouse.x * 0.2;
+    mainGroup.position.y = mouse.y * 0.1 + 0.5;
+
+    mainGroup.rotation.y = mouse.x * 0.03;
+    mainGroup.rotation.x = -mouse.y * 0.03;
+  }
   const render = () => {
     resizeRendererToCanvasSize();
+
+    parallax();
+
     renderer.render(scene, camera);
     window.requestAnimationFrame(render);
   };
