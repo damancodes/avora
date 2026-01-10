@@ -4,5 +4,4 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   plugins: [tailwindcss()],
   base: "/avora/",
-  //add host
 });

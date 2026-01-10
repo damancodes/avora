@@ -179,38 +179,58 @@ async function main() {
       rings.forEach((ring) => obj3d.add(ring));
 
       {
-        // obj3d.add(new THREE.AxesHelper(15));
-      }
-
-      {
         // 1. Define geometry and material once to save memory
-        const geometry = new THREE.PlaneGeometry(0.01, 0.01);
+        const geometry = new THREE.PlaneGeometry(0.02, 0.02);
         const material = new THREE.MeshBasicMaterial({
           map: texture,
           transparent: true,
+
           opacity: 0.2,
           side: THREE.DoubleSide, // Optional: makes planes visible from both sides
         });
 
-        const numberOfPlanes = 20;
-        const range = 0.7; // Adjust this to change how far apart they spread
+        const positions = [
+          // Quadrant 1: Top Right (+x, +y)
+          { x: 0.15, y: 0.45 },
+          { x: 0.45, y: 0.15 },
+          { x: 0.3, y: 0.3 },
+          { x: 0.2, y: 0.1 },
+          { x: 0.1, y: 0.2 },
 
-        for (let i = 0; i < numberOfPlanes; i++) {
+          // Quadrant 2: Top Left (-x, +y)
+          { x: -0.15, y: 0.45 },
+          { x: -0.45, y: 0.15 },
+          { x: -0.3, y: 0.3 },
+          { x: -0.2, y: 0.1 },
+          { x: -0.1, y: 0.2 },
+
+          // Quadrant 3: Bottom Left (-x, -y)
+          { x: -0.15, y: -0.45 },
+          { x: -0.45, y: -0.15 },
+          { x: -0.3, y: -0.3 },
+          { x: -0.2, y: -0.1 },
+          { x: -0.1, y: -0.2 },
+
+          // Quadrant 4: Bottom Right (+x, -y)
+          { x: 0.15, y: -0.45 },
+          { x: 0.45, y: -0.15 },
+          { x: 0.3, y: -0.3 },
+          { x: 0.2, y: -0.1 },
+          { x: 0.1, y: -0.2 },
+        ];
+
+        // Implementation
+        positions.forEach((pos) => {
           const _2dPlane = new THREE.Mesh(geometry, material);
-          _2dPlane.rotateZ(-Math.PI / 2);
-          // 2. Set random positions
-          // (Math.random() - 0.5) * 2 gives a range between -1 and 1
-          _2dPlane.position.x = (Math.random() - 0.5) * range;
-          _2dPlane.position.y = (Math.random() - 0.5) * range;
 
-          // // 3. Set random rotations so they don't all face the same way
-          // _2dPlane.rotation.x = Math.random() * Math.PI;
-          // _2dPlane.rotation.y = Math.random() * Math.PI;
-          // _2dPlane.rotation.z = Math.random() * Math.PI;
+          _2dPlane.position.set(pos.x, pos.y, 0);
 
-          // 4. Add to your object
+          // Rotation still calculates based on the fixed position
+          const angle = Math.atan2(pos.y, pos.x);
+          _2dPlane.rotation.z = angle;
+
           obj3d.add(_2dPlane);
-        }
+        });
       }
       // 2. Initial Rotation to align with the plane's exhaust direction
       obj3dWrapper.rotateX(THREE.MathUtils.degToRad(-90));
@@ -230,7 +250,7 @@ async function main() {
       });
       gsap.to(obj3d.rotation, {
         z: "+=" + Math.PI * 2,
-        duration: 100,
+        duration: 50,
         repeat: -1,
         ease: "linear",
       });
