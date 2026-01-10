@@ -152,7 +152,7 @@ async function main() {
       obj3dWrapper.add(obj3d);
       scene.add(obj3dWrapper);
 
-      const ringRadiuss = [0.1, 0.2, 0.3];
+      const ringRadiuss = [0.2, 0.3, 0.4];
       const width = 0.002;
 
       const rings = ringRadiuss.map((innerRadius, index) => {
@@ -163,8 +163,9 @@ async function main() {
         );
         const ringMaterial = new THREE.MeshBasicMaterial({
           color: "#ffffff",
-          map: contrailTexture,
+          // map: contrailTexture,
           transparent: true,
+          opacity: 0.4,
           depthWrite: false,
           side: THREE.DoubleSide,
         });
@@ -242,9 +243,9 @@ async function main() {
 
       obj3d.scale.set(0, 0, 0);
       gsap.to(obj3d.scale, {
-        x: 8,
-        y: 8,
-        z: 8,
+        x: 6,
+        y: 6,
+        z: 6,
         scrollTrigger: {
           trigger: "body",
           start: "top top",
