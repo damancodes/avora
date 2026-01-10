@@ -9,13 +9,11 @@ const mouse = { x: 0, y: 0 };
 const targetMouse = { x: 0, y: 0 };
 
 window.addEventListener("mousemove", (event) => {
-  // Normalize coordinates from -1 to +1
   targetMouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   targetMouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 });
-// --- MOBILE GSAP FIXES ---
+
 gsap.registerPlugin(ScrollTrigger);
-// Prevents the animation from jumping when the mobile address bar disappears
 ScrollTrigger.config({ ignoreMobileResize: true });
 ScrollTrigger.normalizeScroll(true);
 
@@ -23,15 +21,57 @@ const gui = new GUI();
 gui.hide();
 
 async function main() {
-  const scene = new THREE.Scene();
+  // --- LOADER MANAGER LOGIC ---
+  const loaderElement = document.getElementById("loader");
+  const progressBar = document.getElementById("progress-bar");
+  const progressText = document.getElementById("progress-percentage");
+  const loadingStatus = { progress: 0 };
 
+  const updateUI = () => {
+    const rounded = Math.round(loadingStatus.progress);
+    if (progressBar) progressBar.style.width = `${rounded}%`;
+    if (progressText)
+      progressText.innerText = `${rounded.toString().padStart(2, "0")}%`;
+  };
+
+  const loadingManager = new THREE.LoadingManager(
+    () => {
+      // onLoad
+      gsap.to(loadingStatus, {
+        progress: 100,
+        duration: 0.8,
+        onUpdate: updateUI,
+        onComplete: () => {
+          gsap.to(loaderElement, {
+            opacity: 0,
+            duration: 1,
+            pointerEvents: "none",
+            onComplete: () => {
+              if (loaderElement) loaderElement.style.display = "none";
+            },
+          });
+        },
+      });
+    },
+    (url, itemsLoaded, itemsTotal) => {
+      void url;
+      // onProgress
+      const targetPercent = (itemsLoaded / itemsTotal) * 100;
+      gsap.to(loadingStatus, {
+        progress: targetPercent,
+        duration: 1,
+        ease: "power2.out",
+        onUpdate: updateUI,
+      });
+    }
+  );
+
+  const scene = new THREE.Scene();
   const mainGroup = new THREE.Object3D();
   scene.add(mainGroup);
   mainGroup.position.y -= 0.2;
 
-  const bgParams = {
-    background: "#202020",
-  };
+  const bgParams = { background: "#202020" };
   scene.background = new THREE.Color(bgParams.background);
 
   gui
@@ -46,20 +86,16 @@ async function main() {
   const far = 100;
   const aspect = window.innerWidth / window.innerHeight;
   const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
-
-  // camera.position.set(0, 0, 1);
   scene.add(camera);
 
   const canvas = document.getElementById("c") as HTMLCanvasElement;
 
-  // --- TEXTURES ---
   const createContrailTexture = () => {
     const canvas = document.createElement("canvas");
     canvas.width = 64;
     canvas.height = 64;
     const ctx = canvas.getContext("2d")!;
     const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-
     gradient.addColorStop(0, "rgba(255, 255, 255, 0.7)");
     gradient.addColorStop(0.2, "rgba(255, 255, 255, 0.4)");
     gradient.addColorStop(1, "rgba(255, 255, 255, 0.1)");
@@ -67,18 +103,14 @@ async function main() {
     ctx.fillRect(0, 0, 64, 64);
     return new THREE.CanvasTexture(canvas);
   };
-  const contrailTexture = createContrailTexture();
-  void contrailTexture;
-  // --- RENDERER WITH FLICKER FIX ---
+  void createContrailTexture;
+
   const renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: true,
-    // Fixes Z-fighting/Flickering on mobile GPUs
     logarithmicDepthBuffer: true,
     powerPreference: "high-performance",
   });
-
-  // Limit pixel ratio to 2 (rendering at 3x or 4x on mobile causes lag/heat)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
   function resizeRendererToCanvasSize() {
@@ -88,19 +120,18 @@ async function main() {
     if (needResize) {
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
-
       camera.updateProjectionMatrix();
     }
     return needResize;
   }
 
-  const gltfLoader = new GLTFLoader();
-  const loader = new THREE.TextureLoader();
+  // --- PASS LOADING MANAGER TO LOADERS ---
+  const gltfLoader = new GLTFLoader(loadingManager);
+  const loader = new THREE.TextureLoader(loadingManager);
   const texture = loader.load(generateAssetPath("/images/plane.png"));
 
   gltfLoader.load(generateAssetPath("/model/plane2.glb"), (root) => {
     const model = root.scene;
-
     model.scale.set(0.2, 0.2, 0.2);
     model.position.y -= 0.3;
     const box = new THREE.Box3().setFromObject(model);
@@ -118,9 +149,7 @@ async function main() {
       .normalize();
 
     camera.position.copy(direction.multiplyScalar(distance).add(boxCenter));
-
     camera.position.y = 0;
-
     camera.near = boxSize / 100;
     camera.far = boxSize * 3;
     camera.updateProjectionMatrix();
@@ -128,11 +157,9 @@ async function main() {
 
     mainGroup.add(model);
 
-    // Initial rotation (Kept exactly as requested)
     {
       model.rotateX(THREE.MathUtils.degToRad(10));
       model.rotateY(THREE.MathUtils.degToRad(-140));
-      // model.rotateZ(THREE.MathUtils.degToRad(10));
     }
 
     {
@@ -144,8 +171,8 @@ async function main() {
 
       const ringRadiuss = [0.2, 0.3, 0.4];
       const width = 0.002;
-      const minRadius = 0.18; // 0.2
-      const maxRadius = ringRadiuss[ringRadiuss.length - 1] + width; // 0.402
+      const minRadius = 0.18;
+      const maxRadius = ringRadiuss[ringRadiuss.length - 1] + width;
 
       const rings = ringRadiuss.map((innerRadius, index) => {
         const ringGeometry = new THREE.RingGeometry(
@@ -155,14 +182,12 @@ async function main() {
         );
         const ringMaterial = new THREE.MeshBasicMaterial({
           color: "#ffffff",
-          // map: contrailTexture,
           transparent: true,
           opacity: 0.4,
           depthWrite: false,
           side: THREE.DoubleSide,
         });
         const mesh = new THREE.Mesh(ringGeometry, ringMaterial);
-        // Small Z-offset to prevent overlapping rings from flickering
         mesh.position.z = index * 0.001;
         return mesh;
       });
@@ -176,10 +201,9 @@ async function main() {
           transparent: true,
           opacity: 0.2,
           side: THREE.DoubleSide,
-          depthWrite: false, // Add this to prevent depth conflicts
+          depthWrite: false,
         });
 
-        // Poisson disc sampling for natural distribution without clustering
         function poissonDiscInRing(
           minR: number,
           maxR: number,
@@ -190,39 +214,28 @@ async function main() {
           const points: { x: number; y: number }[] = [];
           const cellSize = minDistance / Math.sqrt(2);
           const grid = new Map<string, { x: number; y: number }[]>();
-
-          function gridKey(x: number, y: number) {
-            return `${Math.floor(x / cellSize)},${Math.floor(y / cellSize)}`;
-          }
-
-          function isInExcludedRange(dist: number) {
-            return excludeRanges.some(
+          const gridKey = (x: number, y: number) =>
+            `${Math.floor(x / cellSize)},${Math.floor(y / cellSize)}`;
+          const isInExcludedRange = (dist: number) =>
+            excludeRanges.some(
               (range) => dist >= range.min && dist <= range.max
             );
-          }
 
           function isValid(x: number, y: number) {
             const dist = Math.sqrt(x * x + y * y);
-            if (dist < minR || dist > maxR) return false;
-            if (isInExcludedRange(dist)) return false;
-
-            // Check neighboring cells
-            const gx = Math.floor(x / cellSize);
-            const gy = Math.floor(y / cellSize);
-
+            if (dist < minR || dist > maxR || isInExcludedRange(dist))
+              return false;
+            const gx = Math.floor(x / cellSize),
+              gy = Math.floor(y / cellSize);
             for (let i = -2; i <= 2; i++) {
               for (let j = -2; j <= 2; j++) {
-                const key = `${gx + i},${gy + j}`;
-                const nearby = grid.get(key);
-                if (nearby) {
-                  for (const p of nearby) {
-                    const dx = p.x - x;
-                    const dy = p.y - y;
-                    if (Math.sqrt(dx * dx + dy * dy) < minDistance) {
+                const nearby = grid.get(`${gx + i},${gy + j}`);
+                if (nearby)
+                  for (const p of nearby)
+                    if (
+                      Math.sqrt((p.x - x) ** 2 + (p.y - y) ** 2) < minDistance
+                    )
                       return false;
-                    }
-                  }
-                }
               }
             }
             return true;
@@ -235,13 +248,14 @@ async function main() {
             points.push({ x, y });
           }
 
-          // Start with initial random point
-          function randomPointInRing(minR: number, maxR: number) {
-            let angle, radius, x, y, dist;
-            let attempts = 0;
+          const initialPoint = (() => {
+            let x,
+              y,
+              dist,
+              attempts = 0;
             do {
-              angle = Math.random() * Math.PI * 2;
-              radius = Math.sqrt(
+              const angle = Math.random() * Math.PI * 2;
+              const radius = Math.sqrt(
                 Math.random() * (maxR * maxR - minR * minR) + minR * minR
               );
               x = Math.cos(angle) * radius;
@@ -249,26 +263,20 @@ async function main() {
               dist = Math.sqrt(x * x + y * y);
               attempts++;
             } while (isInExcludedRange(dist) && attempts < 100);
-
             return { x, y };
-          }
+          })();
 
-          const initialPoint = randomPointInRing(minR, maxR);
           addPoint(initialPoint.x, initialPoint.y);
-
           const activeList = [initialPoint];
-
           while (activeList.length > 0) {
             const randomIndex = Math.floor(Math.random() * activeList.length);
             const point = activeList[randomIndex];
             let found = false;
-
             for (let i = 0; i < maxAttempts; i++) {
-              const angle = Math.random() * Math.PI * 2;
-              const radius = minDistance + Math.random() * minDistance;
-              const newX = point.x + Math.cos(angle) * radius;
-              const newY = point.y + Math.sin(angle) * radius;
-
+              const angle = Math.random() * Math.PI * 2,
+                radius = minDistance + Math.random() * minDistance;
+              const newX = point.x + Math.cos(angle) * radius,
+                newY = point.y + Math.sin(angle) * radius;
               if (isValid(newX, newY)) {
                 addPoint(newX, newY);
                 activeList.push({ x: newX, y: newY });
@@ -276,22 +284,16 @@ async function main() {
                 break;
               }
             }
-
-            if (!found) {
-              activeList.splice(randomIndex, 1);
-            }
+            if (!found) activeList.splice(randomIndex, 1);
           }
-
           return points;
         }
 
-        // Create exclude ranges for each ring (inner radius to outer radius)
         const excludeRanges = ringRadiuss.map((innerRadius) => ({
-          min: innerRadius - 0.005, // Small buffer
-          max: innerRadius + width + 0.005, // Small buffer
+          min: innerRadius - 0.005,
+          max: innerRadius + width + 0.005,
         }));
 
-        // Generate well-distributed plane positions, excluding ring areas
         const planePositions = poissonDiscInRing(
           minRadius,
           maxRadius,
@@ -301,8 +303,7 @@ async function main() {
 
         planePositions.forEach((pos) => {
           const _2dPlane = new THREE.Mesh(geometry, material);
-          // Move planes slightly forward in Z to avoid Z-fighting with rings
-          _2dPlane.position.set(pos.x, pos.y, 0.005); // Changed from 0 to 0.005
+          _2dPlane.position.set(pos.x, pos.y, 0.005);
           const angle = Math.atan2(pos.y, pos.x);
           _2dPlane.rotation.z = angle;
           obj3d.add(_2dPlane);
@@ -310,7 +311,6 @@ async function main() {
       }
       obj3dWrapper.rotateX(THREE.MathUtils.degToRad(-90));
 
-      // GSAP Animations (Optimized for Mobile)
       gsap.to(obj3dWrapper.rotation, {
         x: THREE.MathUtils.degToRad(-45),
         z: THREE.MathUtils.degToRad(20),
@@ -318,8 +318,8 @@ async function main() {
           trigger: "body",
           start: "top top",
           end: "bottom bottom",
-          scrub: 1, // Slightly higher scrub for smoother mobile interpolation
-          invalidateOnRefresh: true, // Recalculates on resize
+          scrub: 1,
+          invalidateOnRefresh: true,
         },
         ease: "sine.inOut",
       });
@@ -373,38 +373,24 @@ async function main() {
       mainGroup.add(directionalLight);
       mainGroup.add(directionalLight.target);
     }
-    {
-      const ambLight = new THREE.AmbientLight("#ffffff", 0.2);
+    mainGroup.add(new THREE.AmbientLight("#ffffff", 0.2));
 
-      mainGroup.add(ambLight);
-    }
-
-    {
-      const material = new THREE.MeshBasicMaterial({ color: "#ffffff" });
-      gui.addColor(material, "color").name("Ground color");
-    }
+    const material = new THREE.MeshBasicMaterial({ color: "#ffffff" });
+    gui.addColor(material, "color").name("Ground color");
   });
 
-  window.addEventListener("mousemove", (event) => {
-    // Normalize coordinates from -1 to +1
-    targetMouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    targetMouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-  });
   function parallax() {
     mouse.x += (targetMouse.x - mouse.x) * 0.05;
     mouse.y += (targetMouse.y - mouse.y) * 0.05;
-
     mainGroup.position.x = mouse.x * 0.2;
     mainGroup.position.y = mouse.y * 0.1 + 0.5;
-
     mainGroup.rotation.y = mouse.x * 0.03;
     mainGroup.rotation.x = -mouse.y * 0.03;
   }
+
   const render = () => {
     resizeRendererToCanvasSize();
-
     parallax();
-
     renderer.render(scene, camera);
     window.requestAnimationFrame(render);
   };

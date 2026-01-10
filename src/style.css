@@ -25,3 +25,81 @@ section {
   position: relative;
   pointer-events: none; /* Allows mouse/touch to hit the canvas if needed */
 }
+#loader {
+  position: fixed;
+  inset: 0;
+  background: #0a0a0a;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  font-family: "Courier New", Courier, monospace;
+  color: #ffffff;
+  transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.loader-wrapper {
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.loader-text-group {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #888;
+}
+
+#progress-percentage {
+  color: #fff;
+  font-weight: bold;
+}
+
+.progress-container {
+  position: relative;
+  height: 4px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  border-radius: 2px;
+}
+
+#progress-bar {
+  position: absolute;
+  height: 100%;
+  width: 0%;
+  background: #fff;
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+}
+
+.scan-line {
+  position: absolute;
+  height: 100%;
+  width: 40px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  animation: scan 1.5s infinite linear;
+}
+
+.loader-subtext {
+  font-size: 9px;
+  color: #444;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+@keyframes scan {
+  from {
+    left: -40px;
+  }
+  to {
+    left: 100%;
+  }
+}
