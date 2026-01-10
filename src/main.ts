@@ -1,10 +1,11 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
 import GUI from "lil-gui";
 
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger"; // Add this
+import { generateAssetPath } from "./util";
 gsap.registerPlugin(ScrollTrigger);
 
 const gui = new GUI();
@@ -54,12 +55,6 @@ async function main() {
 
   camera.position.set(0, 0, 1);
 
-  {
-    const axesHelper = new THREE.AxesHelper(15);
-
-    // scene.add(axesHelper);
-  }
-
   scene.add(camera);
 
   const canvas = document.getElementById("c") as HTMLCanvasElement;
@@ -103,9 +98,9 @@ async function main() {
   const gltfLoader = new GLTFLoader();
 
   const loader = new THREE.TextureLoader();
-  const texture = loader.load("/images/plane.png");
+  const texture = loader.load(generateAssetPath("/images/plane.png"));
 
-  gltfLoader.load("/model/plane1.glb", (root) => {
+  gltfLoader.load(generateAssetPath("/model/plane1.glb"), (root) => {
     const model = root.scene;
     model.scale.set(0.01, 0.01, 0.01);
 
@@ -286,22 +281,16 @@ async function main() {
       scene.add(directionalLight);
       scene.add(directionalLight.target);
     }
-    {
-      //light 2
-      const ambientLight = new THREE.AmbientLight("#ffffff", 0.2);
-      // scene.add(ambientLight);
-    }
 
     {
       //GROUND MESH
-      const planeGeometry = new THREE.PlaneGeometry(20, 20);
+
       const material = new THREE.MeshBasicMaterial({
         color: "#ffffff",
       });
 
       gui.addColor(material, "color").name("Ground color");
 
-      const groundMesh = new THREE.Mesh(planeGeometry, material);
       // groundMesh.rotateX(Math.PI / 2);
     }
   });
