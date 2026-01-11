@@ -134,26 +134,38 @@ async function main() {
     const model = root.scene;
     model.scale.set(0.2, 0.2, 0.2);
     model.position.y -= 0.3;
+
+    // --- ROBUST RESPONSIVE FRAMING ---
     const box = new THREE.Box3().setFromObject(model);
-    const boxSize = box.getSize(new THREE.Vector3()).length();
-    const boxCenter = box.getCenter(new THREE.Vector3());
+    const sphere = new THREE.Sphere();
+    box.getBoundingSphere(sphere);
 
-    const sizeToFitOnScreen = boxSize * 1.2;
-    const halfSizeToFitOnScreen = sizeToFitOnScreen / 2;
-    const halfFovY = THREE.MathUtils.degToRad(camera.fov * 0.5);
-    const distance = halfSizeToFitOnScreen / Math.tan(halfFovY);
+    const center = sphere.center;
+    const radius = sphere.radius;
 
-    const direction = new THREE.Vector3()
-      .subVectors(camera.position, boxCenter)
-      .multiply(new THREE.Vector3(1, 0, 1))
-      .normalize();
+    const fovY = THREE.MathUtils.degToRad(camera.fov);
+    const aspect = camera.aspect;
 
-    camera.position.copy(direction.multiplyScalar(distance).add(boxCenter));
-    camera.position.y = 0;
-    camera.near = boxSize / 100;
-    camera.far = boxSize * 3;
+    // Calculate distance for Vertical fit
+    const distY = radius / Math.sin(fovY / 2);
+
+    // Calculate distance for Horizontal fit (the "Mobile Fix")
+    // Horizontal FOV = 2 * atan( tan(fovY/2) * aspect )
+    const fovX = 2 * Math.atan(Math.tan(fovY / 2) * aspect);
+    const distX = radius / Math.sin(fovX / 2);
+
+    // Pick the larger distance to ensure the model is contained in both directions
+    let finalDistance = Math.max(distY, distX);
+
+    // Add specific safety padding for mobile vs desktop
+    // Mobile (aspect < 1) needs more room because of rotation + parallax
+
+    camera.position.set(center.x, center.y, finalDistance);
+    camera.near = radius;
+    camera.far = radius * 10;
     camera.updateProjectionMatrix();
-    camera.lookAt(boxCenter.x, boxCenter.y, boxCenter.z);
+    camera.lookAt(center);
+    // --- END FRAMING ---
 
     mainGroup.add(model);
 
@@ -334,9 +346,9 @@ async function main() {
       obj3d.scale.set(0, 0, 0);
 
       gsap.to(obj3d.scale, {
-        x: 8,
-        y: 8,
-        z: 8,
+        x: 10,
+        y: 10,
+        z: 10,
         scrollTrigger: {
           trigger: "body",
           start: "top top",
@@ -382,10 +394,12 @@ async function main() {
   function parallax() {
     mouse.x += (targetMouse.x - mouse.x) * 0.05;
     mouse.y += (targetMouse.y - mouse.y) * 0.05;
-    mainGroup.position.x = mouse.x * 0.2;
-    mainGroup.position.y = mouse.y * 0.1 + 0.5;
-    mainGroup.rotation.y = mouse.x * 0.03;
-    mainGroup.rotation.x = -mouse.y * 0.03;
+
+    // Kept parallax very subtle to avoid "pushing" the model off the edge on mobile
+    mainGroup.position.x = mouse.x * 0.05;
+    mainGroup.position.y = mouse.y * 0.05 + 0.3;
+    mainGroup.rotation.y = mouse.x * 0.02;
+    mainGroup.rotation.x = -mouse.y * 0.02;
   }
 
   const render = () => {
