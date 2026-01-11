@@ -1,3 +1,5 @@
 export function generateAssetPath(url: string) {
-  return import.meta.env.BASE_URL + url;
+  const base = import.meta.env.BASE_URL.replace(/\/+$/, "");
+  const path = url.replace(/^\/+/, "");
+  return `${base}/${path}`;
 }
