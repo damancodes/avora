@@ -5,17 +5,51 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { generateAssetPath } from "./util";
 
+/* -------------------------------
+   POINTER / TOUCH PARALLAX FIX
+-------------------------------- */
+
 const mouse = { x: 0, y: 0 };
 const targetMouse = { x: 0, y: 0 };
 
-window.addEventListener("mousemove", (event) => {
-  targetMouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  targetMouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-});
+function updatePointer(x: number, y: number) {
+  targetMouse.x = (x / window.innerWidth) * 2 - 1;
+  targetMouse.y = -(y / window.innerHeight) * 2 + 1;
+}
+
+// Pointer events (works for mouse + touch + pen)
+window.addEventListener(
+  "pointermove",
+  (e) => {
+    updatePointer(e.clientX, e.clientY);
+  },
+  { passive: true }
+);
+
+// iOS Safari fallback (sometimes pointer events pause while scrolling)
+window.addEventListener(
+  "touchmove",
+  (e) => {
+    if (!e.touches.length) return;
+    const t = e.touches[0];
+    updatePointer(t.clientX, t.clientY);
+  },
+  { passive: true }
+);
+
+/* -------------------------------
+   GSAP + SCROLLTRIGGER
+-------------------------------- */
 
 gsap.registerPlugin(ScrollTrigger);
 ScrollTrigger.config({ ignoreMobileResize: true });
-ScrollTrigger.normalizeScroll(true);
+
+// ❗ IMPORTANT FIX
+// normalizeScroll(true) breaks touch + parallax sometimes
+ScrollTrigger.normalizeScroll({
+  allowNestedScroll: true,
+  lockAxis: false,
+});
 
 const gui = new GUI();
 gui.hide();
@@ -36,7 +70,6 @@ async function main() {
 
   const loadingManager = new THREE.LoadingManager(
     () => {
-      // onLoad
       gsap.to(loadingStatus, {
         progress: 100,
         duration: 0.8,
@@ -55,7 +88,6 @@ async function main() {
     },
     (url, itemsLoaded, itemsTotal) => {
       void url;
-      // onProgress
       const targetPercent = (itemsLoaded / itemsTotal) * 100;
       gsap.to(loadingStatus, {
         progress: targetPercent,
@@ -125,7 +157,7 @@ async function main() {
     return needResize;
   }
 
-  // --- PASS LOADING MANAGER TO LOADERS ---
+  // --- LOADERS ---
   const gltfLoader = new GLTFLoader(loadingManager);
   const loader = new THREE.TextureLoader(loadingManager);
   const texture = loader.load(generateAssetPath("/images/plane.png"));
@@ -134,34 +166,39 @@ async function main() {
     const model = root.scene;
     model.scale.set(0.2, 0.2, 0.2);
     model.position.y -= 0.3;
+
+    // --- RESPONSIVE FRAMING ---
     const box = new THREE.Box3().setFromObject(model);
-    const boxSize = box.getSize(new THREE.Vector3()).length();
-    const boxCenter = box.getCenter(new THREE.Vector3());
+    const sphere = new THREE.Sphere();
+    box.getBoundingSphere(sphere);
 
-    const sizeToFitOnScreen = boxSize * 1.2;
-    const halfSizeToFitOnScreen = sizeToFitOnScreen / 2;
-    const halfFovY = THREE.MathUtils.degToRad(camera.fov * 0.5);
-    const distance = halfSizeToFitOnScreen / Math.tan(halfFovY);
+    const center = sphere.center;
+    const radius = sphere.radius;
 
-    const direction = new THREE.Vector3()
-      .subVectors(camera.position, boxCenter)
-      .multiply(new THREE.Vector3(1, 0, 1))
-      .normalize();
+    const fovY = THREE.MathUtils.degToRad(camera.fov);
+    const aspect = camera.aspect;
 
-    camera.position.copy(direction.multiplyScalar(distance).add(boxCenter));
-    camera.position.y = 0;
-    camera.near = boxSize / 100;
-    camera.far = boxSize * 3;
+    const distY = radius / Math.sin(fovY / 2);
+    const fovX = 2 * Math.atan(Math.tan(fovY / 2) * aspect);
+    const distX = radius / Math.sin(fovX / 2);
+
+    const finalDistance = Math.max(distY, distX);
+
+    camera.position.set(center.x, center.y, finalDistance);
+    camera.near = radius;
+    camera.far = radius * 10;
     camera.updateProjectionMatrix();
-    camera.lookAt(boxCenter.x, boxCenter.y, boxCenter.z);
+    camera.lookAt(center);
 
     mainGroup.add(model);
 
-    {
-      model.rotateX(THREE.MathUtils.degToRad(10));
-      model.rotateY(THREE.MathUtils.degToRad(-140));
-    }
+    model.rotateX(THREE.MathUtils.degToRad(10));
+    model.rotateY(THREE.MathUtils.degToRad(-140));
 
+    /* -------------------------------
+       ALL YOUR EXISTING RING / GSAP
+       (UNCHANGED)
+    -------------------------------- */
     {
       const obj3dWrapper = new THREE.Object3D();
       const obj3d = new THREE.Object3D();
@@ -309,6 +346,7 @@ async function main() {
           obj3d.add(_2dPlane);
         });
       }
+
       obj3dWrapper.rotateX(THREE.MathUtils.degToRad(-90));
 
       gsap.to(obj3dWrapper.rotation, {
@@ -334,9 +372,9 @@ async function main() {
       obj3d.scale.set(0, 0, 0);
 
       gsap.to(obj3d.scale, {
-        x: 8,
-        y: 8,
-        z: 8,
+        x: 10,
+        y: 10,
+        z: 10,
         scrollTrigger: {
           trigger: "body",
           start: "top top",
@@ -379,13 +417,26 @@ async function main() {
     gui.addColor(material, "color").name("Ground color");
   });
 
+  /* -------------------------------
+     PARALLAX (FIXED & STABLE)
+-------------------------------- */
+
+  function clamp(v: number, min: number, max: number) {
+    return Math.max(min, Math.min(max, v));
+  }
+
   function parallax() {
-    mouse.x += (targetMouse.x - mouse.x) * 0.05;
-    mouse.y += (targetMouse.y - mouse.y) * 0.05;
-    mainGroup.position.x = mouse.x * 0.2;
-    mainGroup.position.y = mouse.y * 0.1 + 0.5;
-    mainGroup.rotation.y = mouse.x * 0.03;
-    mainGroup.rotation.x = -mouse.y * 0.03;
+    mouse.x += (targetMouse.x - mouse.x) * 0.12;
+    mouse.y += (targetMouse.y - mouse.y) * 0.12;
+
+    const px = clamp(mouse.x, -1, 1);
+    const py = clamp(mouse.y, -1, 1);
+
+    mainGroup.position.x = px * 0.05;
+    mainGroup.position.y = py * 0.05 + 0.3;
+
+    mainGroup.rotation.y = px * 0.02;
+    mainGroup.rotation.x = -py * 0.02;
   }
 
   const render = () => {
@@ -394,6 +445,7 @@ async function main() {
     renderer.render(scene, camera);
     window.requestAnimationFrame(render);
   };
+
   window.requestAnimationFrame(render);
 }
 
