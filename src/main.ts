@@ -185,7 +185,7 @@ async function main() {
     const cloud1Material = new THREE.MeshBasicMaterial({
       map: cloud1,
       transparent: true,
-      opacity: 0.2,
+      opacity: 0.1,
       side: THREE.DoubleSide,
       depthWrite: false,
     });
