@@ -24,6 +24,50 @@ window.addEventListener(
   { passive: true }
 );
 
+function createSweepTexture() {
+  const size = 512;
+  const canvas = document.createElement("canvas") as HTMLCanvasElement;
+  canvas.width = size;
+  canvas.height = size;
+
+  const ctx = canvas.getContext("2d")!;
+  const cx = size / 2;
+  const cy = size / 2;
+  const radius = size / 2;
+
+  ctx.clearRect(0, 0, size, size);
+
+  // How much of the circle is visible (20%)
+  const visibleArc = Math.PI * 2 * 0.4;
+
+  // Draw the sweep
+  for (let i = 0; i < 360; i++) {
+    const angle = (i / 360) * Math.PI * 2;
+
+    let alpha = 0;
+
+    if (angle <= visibleArc) {
+      // fade from white → transparent
+      alpha = 1 - angle / visibleArc;
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, radius, angle, angle + 0.02);
+    ctx.closePath();
+
+    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+    ctx.fill();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+
+  return texture;
+}
+
 /* -------------------------------
    GSAP + SCROLLTRIGGER
 -------------------------------- */
@@ -65,7 +109,7 @@ async function main() {
         },
       });
     },
-    (url, itemsLoaded, itemsTotal) => {
+    (_url, itemsLoaded, itemsTotal) => {
       const targetPercent = (itemsLoaded / itemsTotal) * 100;
       gsap.to(loadingStatus, {
         progress: targetPercent,
@@ -234,6 +278,33 @@ async function main() {
       obj3d.add(ring);
     });
 
+    {
+      //adding rotating ring
+      const geometry = new THREE.RingGeometry(
+        0.1, // inner radius
+        0.19999, // outer radius
+        64, // theta segments
+        1
+      );
+      const gradientTexture = createSweepTexture();
+
+      const material = new THREE.MeshBasicMaterial({
+        map: gradientTexture,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.2,
+      });
+
+      const ring = new THREE.Mesh(geometry, material);
+      gsap.to(ring.rotation, {
+        z: "+=" + Math.PI * 2,
+        duration: 6,
+        repeat: -1,
+        ease: "linear",
+      });
+      obj3d.add(ring);
+    }
+
     // --- SUB-PLANES (SPACING FIX) ---
     function poissonDiscInRing(
       minR: number,
@@ -332,26 +403,26 @@ async function main() {
     light.position.copy(camera.position);
     mainGroup.add(light);
     mainGroup.add(new THREE.AmbientLight("#ffffff", 0.4));
-  });
 
-  function parallax() {
-    // Smoothing the mouse input
-    mouse.x += (targetMouse.x - mouse.x) * 0.12;
-    mouse.y += (targetMouse.y - mouse.y) * 0.12;
-    const px = clamp(mouse.x, -1, 1);
-    const py = clamp(mouse.y, -1, 1);
-    // camera.position.x = cameraBase.x + px * 0.6;
-    // camera.position.y = cameraBase.y + py * 0.6;
-    camera.lookAt(lookAtTarget);
-  }
-  const render = () => {
-    resizeRendererToCanvasSize();
-    parallax();
-    updateStars(); // Animating stars every frame
-    renderer.render(scene, camera);
+    function parallax() {
+      // Smoothing the mouse input
+      mouse.x += (targetMouse.x - mouse.x) * 0.12;
+      mouse.y += (targetMouse.y - mouse.y) * 0.12;
+      const px = clamp(mouse.x, -1, 1);
+      const py = clamp(mouse.y, -1, 1);
+      camera.position.x = cameraBase.x + px * 0.6;
+      camera.position.y = cameraBase.y + py * 0.6;
+      camera.lookAt(lookAtTarget);
+    }
+    const render = () => {
+      resizeRendererToCanvasSize();
+      parallax();
+      updateStars(); // Animating stars every frame
+      renderer.render(scene, camera);
+      window.requestAnimationFrame(render);
+    };
     window.requestAnimationFrame(render);
-  };
-  window.requestAnimationFrame(render);
+  });
 }
 
 main();
