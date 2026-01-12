@@ -20,9 +20,7 @@ function updatePointer(x: number, y: number) {
 }
 window.addEventListener(
   "pointermove",
-  (e) => {
-    updatePointer(e.clientX, e.clientY);
-  },
+  (e) => updatePointer(e.clientX, e.clientY),
   { passive: true }
 );
 
@@ -31,17 +29,12 @@ window.addEventListener(
 -------------------------------- */
 gsap.registerPlugin(ScrollTrigger);
 ScrollTrigger.config({ ignoreMobileResize: true });
-
-ScrollTrigger.normalizeScroll({
-  allowNestedScroll: true,
-  lockAxis: false,
-});
+ScrollTrigger.normalizeScroll({ allowNestedScroll: true, lockAxis: false });
 
 const gui = new GUI();
 gui.hide();
 
 async function main() {
-  // --- LOADER MANAGER LOGIC ---
   const loaderElement = document.getElementById("loader");
   const progressBar = document.getElementById("progress-bar");
   const progressText = document.getElementById("progress-percentage");
@@ -73,7 +66,6 @@ async function main() {
       });
     },
     (url, itemsLoaded, itemsTotal) => {
-      void url;
       const targetPercent = (itemsLoaded / itemsTotal) * 100;
       gsap.to(loadingStatus, {
         progress: targetPercent,
@@ -85,25 +77,16 @@ async function main() {
   );
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color("#111827");
+  scene.background = new THREE.Color("#3eacff");
   const mainGroup = new THREE.Object3D();
   scene.add(mainGroup);
-  mainGroup.position.y = 0;
 
-  const bgParams = { background: "#202020" };
-
-  gui
-    .addColor(bgParams, "background")
-    .name("Scene Background")
-    .onChange((value: any) => {
-      scene.background = new THREE.Color(value);
-    });
-
-  const fov = 45;
-  const near = 0.1;
-  const far = 100;
-  const aspect = window.innerWidth / window.innerHeight;
-  const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+  const camera = new THREE.PerspectiveCamera(
+    45,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    100
+  );
   scene.add(camera);
 
   const cameraBase = new THREE.Vector3();
@@ -122,103 +105,74 @@ async function main() {
   function resizeRendererToCanvasSize() {
     const width = window.innerWidth;
     const height = window.innerHeight;
-    const needResize = canvas.width !== width || canvas.height !== height;
-    if (needResize) {
+    if (canvas.width !== width || canvas.height !== height) {
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
     }
-    return needResize;
   }
 
-  // --- LOADERS ---
   const gltfLoader = new GLTFLoader(loadingManager);
   const textureLoader = new THREE.TextureLoader(loadingManager);
   const texture = textureLoader.load(generateAssetPath("/images/plane.png"));
   const cloud1 = textureLoader.load(generateAssetPath("/images/cloud.png"));
 
-  /* -------------------------------
-     STARS SYSTEM (NEW)
-  -------------------------------- */
-  /* -------------------------------
-     STARS SYSTEM (FIXED)
-  -------------------------------- */
-  const starCount = 50;
+  // --- STARS ---
+  const starCount = 100;
   const starGeometry = new THREE.BufferGeometry();
   const starPositions = new Float32Array(starCount * 3);
   const starVelocities = new Float32Array(starCount);
 
   for (let i = 0; i < starCount; i++) {
-    starPositions[i * 3] = (Math.random() - 0.5) * 15;
-    starPositions[i * 3 + 1] = (Math.random() - 0.5) * 10;
-    starPositions[i * 3 + 2] = -1 * Math.random() * 20;
-
+    starPositions[i * 3] = (Math.random() - 0.5) * 20;
+    starPositions[i * 3 + 1] = (Math.random() - 0.5) * 20;
+    starPositions[i * 3 + 2] = -Math.random() * 20;
     starVelocities[i] = 0.002 + Math.random() * 0.005;
   }
-
-  // !!! ADD THIS LINE !!!
-  // This initializes the 'position' attribute so updateStars() can find it.
   starGeometry.setAttribute(
     "position",
     new THREE.BufferAttribute(starPositions, 3)
   );
-
-  const starTexture = textureLoader.load(
-    "https://threejs.org/examples/textures/sprites/disc.png"
-  );
-
-  // ... rest of your material and points code ...
-
   const starMaterial = new THREE.PointsMaterial({
     color: 0xffffff,
-    size: 0.15, // Increased size slightly to see the texture
-    map: starTexture, // Apply the texture here
+    size: 0.15,
+    map: textureLoader.load(
+      "https://threejs.org/examples/textures/sprites/disc.png"
+    ),
     transparent: true,
     opacity: 0.8,
-    alphaTest: 0.5, // Helps remove the dark edges of the texture square
-    sizeAttenuation: true,
+    alphaTest: 0.5,
   });
-
   const starPoints = new THREE.Points(starGeometry, starMaterial);
   mainGroup.add(starPoints);
 
   function updateStars() {
-    // Use getAttribute instead of accessing .attributes.position directly
     const positionAttribute = starGeometry.getAttribute("position");
-    const positions = positionAttribute.array;
-
+    const positions = positionAttribute.array as any;
     for (let i = 0; i < starCount; i++) {
-      // Move Y down (index i * 3 + 1 is the Y coordinate)
       positions[i * 3 + 1] -= starVelocities[i];
-
-      // Reset to top if it falls below -20
-      if (positions[i * 3 + 1] < -10) {
-        positions[i * 3 + 1] = 10;
-      }
+      if (positions[i * 3 + 1] < -10) positions[i * 3 + 1] = 10;
     }
-
-    // Tell Three.js the positions have changed so it re-renders them
     positionAttribute.needsUpdate = true;
   }
+
   function addClouds() {
-    const cloud1Geometry = new THREE.PlaneGeometry(4, 4);
-    const cloud1Material = new THREE.MeshBasicMaterial({
+    const cloudMat = new THREE.MeshBasicMaterial({
       map: cloud1,
       transparent: true,
-      opacity: 0.1,
+      opacity: 0.6,
       side: THREE.DoubleSide,
       depthWrite: false,
     });
-
-    const cloud1mesh = new THREE.Mesh(cloud1Geometry, cloud1Material);
-    cloud1mesh.scale.set(3, 3, 1);
-    cloud1mesh.position.set(-5, 1, -1);
-    mainGroup.add(cloud1mesh);
-
-    const cloud2mesh = new THREE.Mesh(cloud1Geometry, cloud1Material);
-    cloud2mesh.scale.set(3, 3, 1);
-    cloud2mesh.position.set(5, 1, -1);
-    mainGroup.add(cloud2mesh);
+    const cloudGeo = new THREE.PlaneGeometry(2, 2);
+    const c1 = new THREE.Mesh(cloudGeo, cloudMat);
+    c1.scale.set(3, 3, 1);
+    c1.position.set(-3, 1, -1);
+    mainGroup.add(c1);
+    const c2 = new THREE.Mesh(cloudGeo, cloudMat);
+    c2.scale.set(3, 3, 1);
+    c2.position.set(3, -2, -1);
+    mainGroup.add(c2);
   }
 
   gltfLoader.load(generateAssetPath("/model/plane2.glb"), (root) => {
@@ -252,75 +206,76 @@ async function main() {
     camera.far = radius * 10;
     camera.updateProjectionMatrix();
     camera.lookAt(lookAtTarget);
-
+    model.name = "aeroplane";
     mainGroup.add(model);
     addClouds();
 
-    /* -------------------------------
-       RING / GSAP LOGIC
-    -------------------------------- */
+    // RINGS
     const obj3dWrapper = new THREE.Object3D();
     const obj3d = new THREE.Object3D();
     obj3d.position.z = model.position.z - 0.05;
     obj3dWrapper.add(obj3d);
+
     mainGroup.add(obj3dWrapper);
 
-    const ringRadiuss = [0.2, 0.3, 0.4];
-    const width = 0.002;
-    const minRadius = 0.18;
-    const maxRadius = ringRadiuss[ringRadiuss.length - 1] + width;
-
-    ringRadiuss.forEach((innerRadius, index) => {
-      const ringGeometry = new THREE.RingGeometry(
-        innerRadius,
-        innerRadius + width,
-        64
+    [0.2, 0.3, 0.4].forEach((r, i) => {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(r, r + 0.002, 64),
+        new THREE.MeshBasicMaterial({
+          color: "#ffffff",
+          transparent: true,
+          opacity: 0.4,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+        })
       );
-      const ringMaterial = new THREE.MeshBasicMaterial({
-        color: "#ffffff",
-        transparent: true,
-        opacity: 0.4,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      });
-      const mesh = new THREE.Mesh(ringGeometry, ringMaterial);
-      mesh.position.z = index * 0.001;
-      obj3d.add(mesh);
+      ring.position.z = i * 0.001;
+      obj3d.add(ring);
     });
 
-    // Sub-planes inside rings logic
-    const geometry = new THREE.PlaneGeometry(0.02, 0.02);
-    const material = new THREE.MeshBasicMaterial({
-      map: texture,
-      transparent: true,
-      opacity: 0.2,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    });
-
+    // --- SUB-PLANES (SPACING FIX) ---
     function poissonDiscInRing(
       minR: number,
       maxR: number,
       minDistance: number
     ) {
-      void minDistance;
-      const points: { x: number; y: number }[] = [];
-      for (let i = 0; i < 20; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const r = Math.sqrt(
-          Math.random() * (maxR * maxR - minR * minR) + minR * minR
-        );
-        points.push({ x: Math.cos(angle) * r, y: Math.sin(angle) * r });
+      const pts: { x: number; y: number }[] = [];
+      for (let i = 0; i < 15; i++) {
+        // Target 15 planes
+        for (let j = 0; j < 50; j++) {
+          const angle = Math.random() * Math.PI * 2;
+          const r = Math.sqrt(
+            Math.random() * (maxR * maxR - minR * minR) + minR * minR
+          );
+          const x = Math.cos(angle) * r;
+          const y = Math.sin(angle) * r;
+          if (
+            !pts.some(
+              (p) => Math.sqrt((x - p.x) ** 2 + (y - p.y) ** 2) < minDistance
+            )
+          ) {
+            pts.push({ x, y });
+            break;
+          }
+        }
       }
-      return points;
+      return pts;
     }
 
-    const planePositions = poissonDiscInRing(minRadius, maxRadius, 0.1);
-    planePositions.forEach((pos) => {
-      const _2dPlane = new THREE.Mesh(geometry, material);
-      _2dPlane.position.set(pos.x, pos.y, 0.005);
-      _2dPlane.rotation.z = Math.atan2(pos.y, pos.x);
-      obj3d.add(_2dPlane);
+    const subPlaneGeo = new THREE.PlaneGeometry(0.02, 0.02);
+    const subPlaneMat = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      opacity: 1,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+
+    poissonDiscInRing(0.18, 0.402, 0.12).forEach((pos) => {
+      const p = new THREE.Mesh(subPlaneGeo, subPlaneMat);
+      p.position.set(pos.x, pos.y, 0.005);
+      p.rotation.z = Math.atan2(pos.y, pos.x);
+      obj3d.add(p);
     });
 
     obj3dWrapper.rotateX(THREE.MathUtils.degToRad(-90));
@@ -336,14 +291,12 @@ async function main() {
       },
       ease: "sine.inOut",
     });
-
     gsap.to(obj3d.rotation, {
       z: "+=" + Math.PI * 2,
       duration: 100,
       repeat: -1,
       ease: "linear",
     });
-
     obj3d.scale.set(0, 0, 0);
     gsap.to(obj3d.scale, {
       x: 10,
@@ -356,7 +309,6 @@ async function main() {
         scrub: 1,
       },
     });
-
     gsap.to(model.rotation, {
       z: "+=0.2",
       repeat: -1,
@@ -364,7 +316,6 @@ async function main() {
       yoyo: true,
       ease: "sine.inOut",
     });
-
     gsap.to(model.rotation, {
       x: "+=0.4",
       y: "+=0.7",
@@ -376,14 +327,14 @@ async function main() {
       },
     });
 
-    const directionalLight = new THREE.DirectionalLight("#ffffff", 5);
-    directionalLight.position.copy(camera.position);
-    mainGroup.add(directionalLight);
-    mainGroup.add(directionalLight.target);
-    mainGroup.add(new THREE.AmbientLight("#ffffff", 0.2));
+    const light = new THREE.DirectionalLight("#ffffff", 5);
+    light.position.copy(camera.position);
+    mainGroup.add(light);
+    mainGroup.add(new THREE.AmbientLight("#ffffff", 0.5));
   });
 
   function parallax() {
+    // Smoothing the mouse input
     mouse.x += (targetMouse.x - mouse.x) * 0.12;
     mouse.y += (targetMouse.y - mouse.y) * 0.12;
     const px = clamp(mouse.x, -1, 1);
@@ -392,7 +343,6 @@ async function main() {
     camera.position.y = cameraBase.y + py * 0.6;
     camera.lookAt(lookAtTarget);
   }
-
   const render = () => {
     resizeRendererToCanvasSize();
     parallax();
@@ -400,7 +350,6 @@ async function main() {
     renderer.render(scene, camera);
     window.requestAnimationFrame(render);
   };
-
   window.requestAnimationFrame(render);
 }
 
