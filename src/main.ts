@@ -140,27 +140,42 @@ async function main() {
   /* -------------------------------
      STARS SYSTEM (NEW)
   -------------------------------- */
-  const starCount = 1500;
+  /* -------------------------------
+     STARS SYSTEM (FIXED)
+  -------------------------------- */
+  const starCount = 50;
   const starGeometry = new THREE.BufferGeometry();
   const starPositions = new Float32Array(starCount * 3);
   const starVelocities = new Float32Array(starCount);
 
   for (let i = 0; i < starCount; i++) {
-    starPositions[i * 3] = (Math.random() - 0.5) * 40; // X
-    starPositions[i * 3 + 1] = (Math.random() - 0.5) * 40; // Y
-    starPositions[i * 3 + 2] = (Math.random() - 0.5) * 40; // Z
-    starVelocities[i] = 0.002 + Math.random() * 0.005; // Speed
+    starPositions[i * 3] = (Math.random() - 0.5) * 15;
+    starPositions[i * 3 + 1] = (Math.random() - 0.5) * 10;
+    starPositions[i * 3 + 2] = -1 * Math.random() * 20;
+
+    starVelocities[i] = 0.002 + Math.random() * 0.005;
   }
 
+  // !!! ADD THIS LINE !!!
+  // This initializes the 'position' attribute so updateStars() can find it.
   starGeometry.setAttribute(
     "position",
     new THREE.BufferAttribute(starPositions, 3)
   );
+
+  const starTexture = textureLoader.load(
+    "https://threejs.org/examples/textures/sprites/disc.png"
+  );
+
+  // ... rest of your material and points code ...
+
   const starMaterial = new THREE.PointsMaterial({
     color: 0xffffff,
-    size: 0.05,
+    size: 0.15, // Increased size slightly to see the texture
+    map: starTexture, // Apply the texture here
     transparent: true,
-    opacity: 0.6,
+    opacity: 0.8,
+    alphaTest: 0.5, // Helps remove the dark edges of the texture square
     sizeAttenuation: true,
   });
 
@@ -168,18 +183,23 @@ async function main() {
   mainGroup.add(starPoints);
 
   function updateStars() {
-    const positions = starGeometry.attributes.position.array as Float32Array;
+    // Use getAttribute instead of accessing .attributes.position directly
+    const positionAttribute = starGeometry.getAttribute("position");
+    const positions = positionAttribute.array;
+
     for (let i = 0; i < starCount; i++) {
-      // Move Y down
+      // Move Y down (index i * 3 + 1 is the Y coordinate)
       positions[i * 3 + 1] -= starVelocities[i];
+
       // Reset to top if it falls below -20
-      if (positions[i * 3 + 1] < -20) {
-        positions[i * 3 + 1] = 20;
+      if (positions[i * 3 + 1] < -10) {
+        positions[i * 3 + 1] = 10;
       }
     }
-    starGeometry.attributes.position.needsUpdate = true;
-  }
 
+    // Tell Three.js the positions have changed so it re-renders them
+    positionAttribute.needsUpdate = true;
+  }
   function addClouds() {
     const cloud1Geometry = new THREE.PlaneGeometry(4, 4);
     const cloud1Material = new THREE.MeshBasicMaterial({
