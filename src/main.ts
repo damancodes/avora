@@ -76,7 +76,7 @@ ScrollTrigger.config({ ignoreMobileResize: true });
 ScrollTrigger.normalizeScroll({ allowNestedScroll: true, lockAxis: false });
 
 const gui = new GUI();
-gui.hide();
+// gui.hide();
 
 async function main() {
   const loaderElement = document.getElementById("loader");
@@ -121,7 +121,21 @@ async function main() {
   );
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color("#3eacff");
+  scene.background = new THREE.Color("#29264f");
+  const params = {
+    backgroundColor: "#29264f",
+  };
+
+  gui
+    .addColor(params, "backgroundColor")
+    .name("Background")
+    .onChange((value: any) => {
+      if (scene.background instanceof THREE.Color) {
+        scene.background.set(value);
+      } else {
+        scene.background = new THREE.Color(value);
+      }
+    });
   const mainGroup = new THREE.Object3D();
   scene.add(mainGroup);
 
@@ -399,7 +413,7 @@ async function main() {
       },
     });
 
-    const light = new THREE.DirectionalLight(0xfff1d6, 6);
+    const light = new THREE.DirectionalLight(0xffffff, 6);
     light.position.copy(camera.position);
     mainGroup.add(light);
     mainGroup.add(new THREE.AmbientLight("#ffffff", 0.4));
