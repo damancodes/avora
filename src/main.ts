@@ -177,10 +177,12 @@ async function main() {
 
   gltfLoader.load(generateAssetPath("/model/plane2.glb"), (root) => {
     const model = root.scene;
+    model.name = "aeroplane";
+
     model.scale.set(0.2, 0.2, 0.2);
     model.rotateX(THREE.MathUtils.degToRad(10));
     model.rotateY(THREE.MathUtils.degToRad(-140));
-    model.position.y -= 0.3;
+    // model.position.y -= 0.3;
 
     const box = new THREE.Box3().setFromObject(model);
     const sphere = new THREE.Sphere();
@@ -196,7 +198,7 @@ async function main() {
     const distX = radius / Math.sin(fovX / 2);
 
     let finalDistance = Math.max(distY, distX);
-    finalDistance = finalDistance / 2 + 2;
+    finalDistance = finalDistance / 2 + 1;
     camera.position.set(center.x, center.y, finalDistance);
 
     cameraBase.copy(camera.position);
@@ -206,7 +208,6 @@ async function main() {
     camera.far = radius * 10;
     camera.updateProjectionMatrix();
     camera.lookAt(lookAtTarget);
-    model.name = "aeroplane";
     mainGroup.add(model);
     addClouds();
 
@@ -327,10 +328,10 @@ async function main() {
       },
     });
 
-    const light = new THREE.DirectionalLight("#ffffff", 5);
+    const light = new THREE.DirectionalLight(0xfff1d6, 6);
     light.position.copy(camera.position);
     mainGroup.add(light);
-    mainGroup.add(new THREE.AmbientLight("#ffffff", 0.5));
+    mainGroup.add(new THREE.AmbientLight("#ffffff", 0.4));
   });
 
   function parallax() {
@@ -339,8 +340,8 @@ async function main() {
     mouse.y += (targetMouse.y - mouse.y) * 0.12;
     const px = clamp(mouse.x, -1, 1);
     const py = clamp(mouse.y, -1, 1);
-    camera.position.x = cameraBase.x + px * 0.6;
-    camera.position.y = cameraBase.y + py * 0.6;
+    // camera.position.x = cameraBase.x + px * 0.6;
+    // camera.position.y = cameraBase.y + py * 0.6;
     camera.lookAt(lookAtTarget);
   }
   const render = () => {
