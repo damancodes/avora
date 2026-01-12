@@ -8,7 +8,9 @@ import { generateAssetPath } from "./util";
 /* -------------------------------
    POINTER / TOUCH PARALLAX FIX
 -------------------------------- */
-
+function clamp(v: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, v));
+}
 const mouse = { x: 0, y: 0 };
 const targetMouse = { x: 0, y: 0 };
 
@@ -16,25 +18,14 @@ function updatePointer(x: number, y: number) {
   targetMouse.x = (x / window.innerWidth) * 2 - 1;
   targetMouse.y = -(y / window.innerHeight) * 2 + 1;
 }
-
 window.addEventListener(
   "pointermove",
   (e) => {
+    console.log("pointer is moving ");
     updatePointer(e.clientX, e.clientY);
   },
   { passive: true }
 );
-
-window.addEventListener(
-  "touchmove",
-  (e) => {
-    if (!e.touches.length) return;
-    const t = e.touches[0];
-    updatePointer(t.clientX, t.clientY);
-  },
-  { passive: true }
-);
-
 /* -------------------------------
    GSAP + SCROLLTRIGGER
 -------------------------------- */
@@ -165,7 +156,13 @@ async function main() {
 
   gltfLoader.load(generateAssetPath("/model/plane2.glb"), (root) => {
     const model = root.scene;
+
     model.scale.set(0.2, 0.2, 0.2);
+    {
+      //initial rotation
+      model.rotateX(THREE.MathUtils.degToRad(10));
+      model.rotateY(THREE.MathUtils.degToRad(-140));
+    }
     model.position.y -= 0.3;
 
     // --- RESPONSIVE FRAMING ---
@@ -183,24 +180,23 @@ async function main() {
     const fovX = 2 * Math.atan(Math.tan(fovY / 2) * aspect);
     const distX = radius / Math.sin(fovX / 2);
 
-    const finalDistance = Math.max(distY, distX);
-
+    let finalDistance = Math.max(distY, distX);
+    console.log("final distance ", finalDistance);
     // Set Initial Camera Position
+    finalDistance = finalDistance / 2 + 2;
     camera.position.set(center.x, center.y, finalDistance);
 
     // Capture Base Position and LookAt for Parallax
+
     cameraBase.copy(camera.position);
     lookAtTarget.copy(center);
 
-    camera.near = radius;
+    camera.near = radius * 0.1;
     camera.far = radius * 10;
     camera.updateProjectionMatrix();
     camera.lookAt(lookAtTarget);
 
     mainGroup.add(model);
-
-    model.rotateX(THREE.MathUtils.degToRad(10));
-    model.rotateY(THREE.MathUtils.degToRad(-140));
 
     /* -------------------------------
        RING / GSAP LOGIC
@@ -427,10 +423,6 @@ async function main() {
      PARALLAX (UPDATED TO CAMERA)
 -------------------------------- */
 
-  function clamp(v: number, min: number, max: number) {
-    return Math.max(min, Math.min(max, v));
-  }
-
   function parallax() {
     mouse.x += (targetMouse.x - mouse.x) * 0.12;
     mouse.y += (targetMouse.y - mouse.y) * 0.12;
@@ -440,8 +432,8 @@ async function main() {
 
     // Apply parallax to the CAMERA instead of mainGroup
     // We add an offset to the base coordinates we captured during loading
-    camera.position.x = cameraBase.x + px * 0.35;
-    camera.position.y = cameraBase.y + py * 0.35;
+    camera.position.x = cameraBase.x + px * 0.6;
+    camera.position.y = cameraBase.y + py * 0.6;
 
     // Optional: Keep the camera looking at the model center for a slight swivel effect
     camera.lookAt(lookAtTarget);
