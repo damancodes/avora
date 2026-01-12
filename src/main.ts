@@ -17,7 +17,6 @@ function updatePointer(x: number, y: number) {
   targetMouse.y = -(y / window.innerHeight) * 2 + 1;
 }
 
-// Pointer events (works for mouse + touch + pen)
 window.addEventListener(
   "pointermove",
   (e) => {
@@ -26,7 +25,6 @@ window.addEventListener(
   { passive: true }
 );
 
-// iOS Safari fallback (sometimes pointer events pause while scrolling)
 window.addEventListener(
   "touchmove",
   (e) => {
@@ -44,8 +42,6 @@ window.addEventListener(
 gsap.registerPlugin(ScrollTrigger);
 ScrollTrigger.config({ ignoreMobileResize: true });
 
-// ❗ IMPORTANT FIX
-// normalizeScroll(true) breaks touch + parallax sometimes
 ScrollTrigger.normalizeScroll({
   allowNestedScroll: true,
   lockAxis: false,
@@ -101,7 +97,8 @@ async function main() {
   const scene = new THREE.Scene();
   const mainGroup = new THREE.Object3D();
   scene.add(mainGroup);
-  mainGroup.position.y -= 0.2;
+  // Reset mainGroup position (handled by camera now)
+  mainGroup.position.y = 0;
 
   const bgParams = { background: "#202020" };
   scene.background = new THREE.Color(bgParams.background);
@@ -119,6 +116,10 @@ async function main() {
   const aspect = window.innerWidth / window.innerHeight;
   const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
   scene.add(camera);
+
+  // Variables to store framing data for parallax
+  const cameraBase = new THREE.Vector3();
+  const lookAtTarget = new THREE.Vector3();
 
   const canvas = document.getElementById("c") as HTMLCanvasElement;
 
@@ -184,11 +185,17 @@ async function main() {
 
     const finalDistance = Math.max(distY, distX);
 
+    // Set Initial Camera Position
     camera.position.set(center.x, center.y, finalDistance);
+
+    // Capture Base Position and LookAt for Parallax
+    cameraBase.copy(camera.position);
+    lookAtTarget.copy(center);
+
     camera.near = radius;
     camera.far = radius * 10;
     camera.updateProjectionMatrix();
-    camera.lookAt(center);
+    camera.lookAt(lookAtTarget);
 
     mainGroup.add(model);
 
@@ -196,8 +203,7 @@ async function main() {
     model.rotateY(THREE.MathUtils.degToRad(-140));
 
     /* -------------------------------
-       ALL YOUR EXISTING RING / GSAP
-       (UNCHANGED)
+       RING / GSAP LOGIC
     -------------------------------- */
     {
       const obj3dWrapper = new THREE.Object3D();
@@ -418,7 +424,7 @@ async function main() {
   });
 
   /* -------------------------------
-     PARALLAX (FIXED & STABLE)
+     PARALLAX (UPDATED TO CAMERA)
 -------------------------------- */
 
   function clamp(v: number, min: number, max: number) {
@@ -432,11 +438,13 @@ async function main() {
     const px = clamp(mouse.x, -1, 1);
     const py = clamp(mouse.y, -1, 1);
 
-    mainGroup.position.x = px * 0.05;
-    mainGroup.position.y = py * 0.05 + 0.3;
+    // Apply parallax to the CAMERA instead of mainGroup
+    // We add an offset to the base coordinates we captured during loading
+    camera.position.x = cameraBase.x + px * 0.35;
+    camera.position.y = cameraBase.y + py * 0.35;
 
-    mainGroup.rotation.y = px * 0.02;
-    mainGroup.rotation.x = -py * 0.02;
+    // Optional: Keep the camera looking at the model center for a slight swivel effect
+    camera.lookAt(lookAtTarget);
   }
 
   const render = () => {
