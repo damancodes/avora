@@ -295,11 +295,12 @@ async function main() {
     {
       //adding rotating ring
       const geometry = new THREE.RingGeometry(
-        0.1, // inner radius
-        0.19999, // outer radius
+        0.2, // inner radius
+        1.8, // outer radius
         64, // theta segments
         1
       );
+
       const gradientTexture = createSweepTexture();
 
       const material = new THREE.MeshBasicMaterial({
@@ -316,7 +317,8 @@ async function main() {
         repeat: -1,
         ease: "linear",
       });
-      obj3d.add(ring);
+
+      obj3dWrapper.add(ring);
     }
 
     // --- SUB-PLANES (SPACING FIX) ---
